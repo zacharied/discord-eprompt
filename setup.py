@@ -5,7 +5,7 @@ with open('README.md', 'r') as desc:
 
 setuptools.setup(
     name='discord-eprompt',
-    version='0.1.1',
+    version='0.2.1',
     author='Zach Day',
     author_email='z@zach.gdn',
     description='Reaction-based user interfaces for discord.py bots',
