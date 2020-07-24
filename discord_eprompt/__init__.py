@@ -51,11 +51,16 @@ class ReactPrompt(commands.Cog):
 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
+        if reaction.message.id != self.message.id:
+            # Only act when the bound message is reacted to.
+            return
+
         if user == self.bot.user:
             # Allow the bot to react with the choices.
             return
+
         if user != self.user or str(reaction) not in self.reacts.keys():
-            # Remove any other reactions.
+            # Remove reactions from other users, or reactions that were not already made by the bot.
             await self.message.remove_reaction(reaction, user)
             return
 
