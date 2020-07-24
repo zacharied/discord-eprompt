@@ -50,11 +50,11 @@ class ReactPrompt(commands.Cog):
         self.reactions_added = False
 
     async def setup(self):
+        self.bot.add_cog(self)
+
         for react in self.reacts.keys():
             await self.message.add_reaction(react)
         self.reactions_added = True
-
-        self.bot.add_cog(self)
 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
@@ -66,12 +66,11 @@ class ReactPrompt(commands.Cog):
             # Allow the bot to react with the choices.
             return
 
-        if not self.reactions_added:
-            await self.message.remove_reaction(reaction, user)
-            return
-
-        if user != self.user or str(reaction) not in self.reacts.keys():
-            # Remove reactions from other users, or reactions that were not already made by the bot.
+        if not self.reactions_added or \
+                user != self.user or \
+                str(reaction) not in self.reacts.keys():
+            # Prevent user from making a choice before we've added all of them.
+            # Also remove reactions from other users, or reactions that were not already made by the bot.
             await self.message.remove_reaction(reaction, user)
             return
 
