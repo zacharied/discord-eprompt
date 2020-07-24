@@ -4,6 +4,21 @@
 
 Reaction-based user input prompts for Discord bots
 
+## Usage
+
+A *reaction prompt* is simply a message with a set of predefined reactions and a target user. The bot reacts to the 
+message with its set of reactions, leaving what are basically buttons which can be clicked by users. Normally, clicking 
+on a reaction would just increase the count of that reaction on the message.  With reaction prompts, however, a 
+callback with the choice is fired as soon as the target user clicks on one, allowing bots to actively respond to the 
+user's button selection.
+
+The library maintains a number of constraints on the message before the target user makes a decision. Reactions by 
+those other than the target user are removed immediately, as are reactions *by* the target user that aren't apart of 
+the predefined list of choices.
+
+This package provides one method, `react_prompt_response` which takes a Discord message and turns it into a reaction
+prompt. See its own documentation for usage details.
+
 ## Testing
 
 Due to the difficulty of unit-testing this stuff there is currently no automated testing suite. However, there is the
