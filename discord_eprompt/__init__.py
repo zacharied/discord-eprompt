@@ -5,10 +5,11 @@ from discord.ext import commands
 
 from enum import Enum
 
-from typing import Dict
+from typing import Dict, Union
 
 class ReactPromptPreset(Enum):
-    """ 
+    """ Common sets of choices for prompts.
+
     A preset is defined as a dictionary with the keys being emoji to react with, and the values being a string 
     representation of the response.
     """
@@ -22,7 +23,28 @@ async def on_prompt_reacted(prompt, bot, response:str, future):
     
     future.set_result(response)
 
-async def react_prompt_response(bot, user, message, preset:ReactPromptPreset=None, reacts:Dict[str, str]=None):
+async def react_prompt_response(
+        bot: commands.Bot,
+        user: Union[discord.User, discord.Member],
+        message: discord.Message,
+        preset:ReactPromptPreset=None,
+        reacts:Dict[str, str]=None
+):
+    """ Use a message as a reaction prompt and get the user's choice. 
+
+    The bot will add the given reactions to the message and disallow anyone other than the specified user from reacting.
+    This will return a string representation of the user's choice when the user clicks on a reaction.
+
+    :param bot: The bot that will react to the message with the choices for the user.
+    :param user: The user who is allowed to react.
+    :param message: The message to use as the prompt.
+    :param preset: The list of choices, defined as a preset by the library.
+    :param reacts: The list of choices, defined as a dictionary in which the keys are the emoji to use as the reaction,
+        and the values are what will be returned when that respective choice is selected.
+
+    :return: The user's choice.
+    """
+
     if preset is None and reacts is None:
         raise ValueError('either a preset or set of reactions must be defined')
     elif preset is not None and reacts is not None:
