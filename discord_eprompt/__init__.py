@@ -34,10 +34,7 @@ async def react_prompt_response(bot, user, message, preset:ReactPromptPreset=Non
     future = loop.create_future()
 
     prompt = ReactPrompt(bot, user, message, reacts, lambda response: on_prompt_reacted(prompt, bot, response, future))
-    bot.add_cog(prompt)
-
-    for react in reacts:
-        await prompt.message.add_reaction(react)
+    await prompt.setup()
 
     return await future
 
@@ -49,6 +46,15 @@ class ReactPrompt(commands.Cog):
         self.reacts = reacts
         self.callback = callback
 
+        self.reactions_added = False
+
+    async def setup(self):
+        for react in self.reacts.keys():
+            await self.message.add_reaction(react)
+        self.reactions_added = True
+
+        self.bot.add_cog(self)
+
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
         if reaction.message.id != self.message.id:
@@ -57,6 +63,10 @@ class ReactPrompt(commands.Cog):
 
         if user == self.bot.user:
             # Allow the bot to react with the choices.
+            return
+
+        if not self.reactions_added:
+            await self.message.remove_reaction(reaction, user)
             return
 
         if user != self.user or str(reaction) not in self.reacts.keys():
