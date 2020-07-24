@@ -1,6 +1,7 @@
 # discord-eprompt
 
 [![PyPI version](https://badge.fury.io/py/discord-eprompt.svg)](https://badge.fury.io/py/discord-eprompt)
+[![Documentation Status](https://readthedocs.org/projects/discord-eprompt/badge/?version=latest)](https://discord-eprompt.readthedocs.io/en/latest/?badge=latest)
 
 Reaction-based user input prompts for Discord bots
 
