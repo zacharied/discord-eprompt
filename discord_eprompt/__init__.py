@@ -14,6 +14,7 @@ class ReactPromptPreset(Enum):
     """
 
     YES_NO = {'\U0001F44D': 'yes', '\U0001F44E': 'no'}
+    DIGITS = {f'{i}\u20e3': i for i in range(10)}
 
 async def on_prompt_reacted(prompt, bot, response:str, future):
     await prompt.message.delete()
