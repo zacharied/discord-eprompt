@@ -17,7 +17,7 @@ class ReactPromptPreset(Enum):
     YES_NO = {'\U0001F44D': 'yes', '\U0001F44E': 'no'}
     DIGITS = {f'{i}\u20e3': i for i in range(10)}
 
-async def on_prompt_reacted(prompt, bot, response:str, future):
+async def _on_prompt_reacted(prompt, bot, response:str, future):
     await prompt.message.delete()
     bot.remove_cog(prompt)
     
@@ -56,12 +56,12 @@ async def react_prompt_response(
     loop = asyncio.get_running_loop()
     future = loop.create_future()
 
-    prompt = ReactPrompt(bot, user, message, reacts, lambda response: on_prompt_reacted(prompt, bot, response, future))
+    prompt = _ReactPrompt(bot, user, message, reacts, lambda response: _on_prompt_reacted(prompt, bot, response, future))
     await prompt.setup()
 
     return await future
 
-class ReactPrompt(commands.Cog):
+class _ReactPrompt(commands.Cog):
     def __init__(self, bot: commands.Bot, user: discord.User, message: discord.Message, reacts: Dict[str, str], callback):
         self.bot = bot
         self.user = user
