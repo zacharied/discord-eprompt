@@ -1,4 +1,5 @@
 import asyncio
+import string, random
 
 import discord
 from discord.ext import commands
@@ -6,6 +7,8 @@ from discord.ext import commands
 from enum import Enum
 
 from typing import Dict, Union
+
+_COG_IDENTIFIER_LENGTH = 8
 
 class ReactPromptPreset(Enum):
     """ Common sets of choices for prompts.
@@ -18,8 +21,10 @@ class ReactPromptPreset(Enum):
     DIGITS = {f'{i}\u20e3': i for i in range(10)}
 
 async def _on_prompt_reacted(prompt, bot, response:str, future):
-    await prompt.message.delete()
-    bot.remove_cog(prompt)
+    if not prompt.persist_message:
+        await prompt.message.delete()
+
+    bot.remove_cog(prompt.identifier)
     
     future.set_result(response)
 
@@ -28,7 +33,8 @@ async def react_prompt_response(
         user: Union[discord.User, discord.Member],
         message: discord.Message,
         preset:ReactPromptPreset=None,
-        reacts:Dict[str, str]=None
+        reacts:Dict[str, str]=None,
+        persist_message:bool=False
 ):
     """ Use a message as a reaction prompt and get the user's choice. 
 
@@ -41,6 +47,8 @@ async def react_prompt_response(
     :param preset: The list of choices, defined as a preset by the library.
     :param reacts: The list of choices, defined as a dictionary in which the keys are the emoji to use as the reaction,
         and the values are what will be returned when that respective choice is selected.
+    :param persist_message: Whether or not to keep the message after the user reacts to it. The default behavior is to
+        delete the message upon user input.
 
     :return: The user's choice.
     """
@@ -56,45 +64,79 @@ async def react_prompt_response(
     loop = asyncio.get_running_loop()
     future = loop.create_future()
 
-    prompt = _ReactPrompt(bot, user, message, reacts, lambda response: _on_prompt_reacted(prompt, bot, response, future))
+    cls = _prompt_cog_generate()
+    prompt = cls(bot, user, message, reacts, persist_message, lambda response: _on_prompt_reacted(prompt, bot, response, future))
     await prompt.setup()
 
     return await future
 
-class _ReactPrompt(commands.Cog):
-    def __init__(self, bot: commands.Bot, user: discord.User, message: discord.Message, reacts: Dict[str, str], callback):
-        self.bot = bot
-        self.user = user
-        self.message = message
-        self.reacts = reacts
-        self.callback = callback
+def _prompt_cog_generate():
+    """ Create a new ReactPrompt class with a randomized identifier.
 
-        self.reactions_added = False
+    The random identifier is required because while calls to `add_cog` take a cog as a parameter, removing the cog takes a string. By default, the
+     string value is just the name of the class. It can be changed by setting the cog's meta info, done here via the `name` kwarg. However, this will
+     still fail in the even that more than one instance of the ReactPrompt cog is added to the bot at once, since all instances of the cog will have
+     the same name and thus cannot be distinguished during the `remove_cog` call. The solution here is to dynamically generate the ReactPrompt class
+     with a new `name` parameter each time we add it to the bot. We store the value of the name in the prompt as well, and then reference that when
+     we need to remove the cog.
+    """
 
-    async def setup(self):
-        self.bot.add_cog(self)
+    cog_identifier = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
 
-        for react in self.reacts.keys():
-            await self.message.add_reaction(react)
-        self.reactions_added = True
+    class ReactPrompt(commands.Cog, name=cog_identifier):
+        def __init__(self, bot: commands.Bot, user: discord.User, message: discord.Message, reacts: Dict[str, str], persist_message: bool, callback):
+            self.bot = bot
+            self.user = user
+            self.message = message
+            self.reacts = reacts
+            self.persist_message = persist_message
+            self.callback = callback
+            self.identifier = cog_identifier
 
-    @commands.Cog.listener()
-    async def on_reaction_add(self, reaction, user):
-        if reaction.message.id != self.message.id:
-            # Only act when the bound message is reacted to.
-            return
+            self.reactions_added = False
 
-        if user == self.bot.user:
-            # Allow the bot to react with the choices.
-            return
+        async def setup(self):
+            self.bot.add_cog(self)
 
-        if not self.reactions_added or \
-                user != self.user or \
-                str(reaction) not in self.reacts.keys():
-            # Prevent user from making a choice before we've added all of them.
-            # Also remove reactions from other users, or reactions that were not already made by the bot.
-            await self.message.remove_reaction(reaction, user)
-            return
+            # Reactions are not added to the `message` object itself since it is cached from when we
+            #  first sent it. We need to fetch the message to get its updated state.
+            cache_message = await self.message.channel.fetch_message(self.message.id)
 
-        reaction_response = self.reacts[str(reaction)]
-        await self.callback(reaction_response)
+            for react in cache_message.reactions:
+                # Remove any reactions made before we attached to this message.
+                if react.emoji not in self.reacts.keys():
+                    # Remove reactions not in our choices.
+                    await react.clear()
+                    continue
+                
+                async for user in react.users():
+                    # Remove reactions that *are* in our choices but aren't from the bot.
+                    if user != self.bot.user:
+                        await react.remove(user)
+
+            for react in self.reacts.keys():
+                await self.message.add_reaction(react)
+            self.reactions_added = True
+
+        @commands.Cog.listener()
+        async def on_reaction_add(self, reaction, user):
+            if reaction.message.id != self.message.id:
+                # Only act when the bound message is reacted to.
+                return
+
+            if user == self.bot.user:
+                # Allow the bot to react with the choices.
+                return
+
+            if not self.reactions_added or \
+                    user != self.user or \
+                    str(reaction) not in self.reacts.keys():
+                # Prevent user from making a choice before we've added all of them.
+                # Also remove reactions from other users, or reactions that were not already made by the bot.
+                await self.message.remove_reaction(reaction, user)
+                return
+
+            reaction_response = self.reacts[str(reaction)]
+            await self.callback(reaction_response)
+
+    return ReactPrompt
